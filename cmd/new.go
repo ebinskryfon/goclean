@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/charmbracelet/huh"
 	"github.com/ebinskryfon/goclean/pkg/generator"
 	"github.com/ebinskryfon/goclean/pkg/strutil"
 	"github.com/ebinskryfon/goclean/pkg/ui"
@@ -32,7 +33,7 @@ var (
 var newCmd = &cobra.Command{
 	Use:   "new [project-name]",
 	Short: "Create a fresh Go Clean Architecture project",
-	Long:  "Bootstraps a complete, production-ready Go Clean Architecture backend with Gin, GORM, PostgreSQL, Viper, Zerolog, migrations, and Docker.",
+	Long:  "Bootstraps a complete, production-ready Go Clean Architecture backend with your choice of router (Gin or Chi) and database (PostgreSQL, MySQL or SQLite), plus GORM, Viper, Zerolog, migrations, and Docker.",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.Banner(AppVersion)
@@ -57,9 +58,18 @@ var newCmd = &cobra.Command{
 			return fmt.Errorf("invalid project name %q: use letters, digits, '-', '_' or '.', starting with a letter or digit", projectName)
 		}
 
+		// Fail on an unusable target directory before asking any stack questions.
+		if entries, err := os.ReadDir(filepath.Join(".", strutil.ToKebabCase(projectName))); err == nil && len(entries) > 0 && !flagForce {
+			return fmt.Errorf("directory %s already exists and is not empty (use --force to generate into it)", strutil.ToKebabCase(projectName))
+		}
+
 		if interactive() && !flagDryRun {
 			if err := runStackWizard(cmd); err != nil {
-				return fmt.Errorf("stack selection cancelled: %w", err)
+				if errors.Is(err, huh.ErrUserAborted) {
+					fmt.Println("Cancelled.")
+					return nil
+				}
+				return fmt.Errorf("stack selection failed: %w", err)
 			}
 		}
 

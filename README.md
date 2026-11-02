@@ -8,7 +8,7 @@ Bakes in enterprise-tested architecture from real-world Go backend production sy
 
 ## ⚡ Worldwide Installation
 
-Anyone with Go 1.22+ (generated projects target Go 1.23 and Go will fetch that toolchain automatically) installed can install `goclean` globally with one command:
+Anyone with Go 1.22+ (goclean and generated projects target Go 1.23; Go will fetch that toolchain automatically) installed can install `goclean` globally with one command:
 
 ```bash
 go install github.com/ebinskryfon/goclean@latest
@@ -103,7 +103,7 @@ Every run ends with a created / overwritten / skipped summary.
 
 #### Check your environment
 ```bash
-goclean doctor   # verifies Go 1.22+, git and docker
+goclean doctor   # verifies Go 1.22+ (1.23+ recommended), git and docker
 ```
 
 #### Granular Generators

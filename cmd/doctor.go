@@ -22,7 +22,7 @@ var doctorCmd = &cobra.Command{
 		ui.Header("goclean doctor")
 		failed := false
 
-		// Go (required, >= 1.22)
+		// Go (required, >= 1.22; 1.23+ recommended since goclean itself needs 1.23)
 		if out, err := run("go", "version"); err != nil {
 			ui.Error("go: not found in PATH (required)")
 			failed = true
@@ -34,7 +34,7 @@ var doctorCmd = &cobra.Command{
 			if major > 1 || minor >= 23 {
 				ui.Success("go: %s", out)
 			} else if minor == 22 {
-				ui.Warn("go: %s (works, but generated projects target Go 1.23 and will auto-download that toolchain)", out)
+				ui.Warn("go: %s (works, but goclean and generated projects need Go 1.23 and Go will auto-download that toolchain)", out)
 			} else {
 				ui.Error("go: %s (Go 1.22+ required, 1.23+ recommended)", out)
 				failed = true
