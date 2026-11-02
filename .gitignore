@@ -1,0 +1,6 @@
+goclean
+bin/
+tmp/
+*.exe
+*.test
+.DS_Store
