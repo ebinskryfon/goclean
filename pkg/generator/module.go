@@ -3,12 +3,13 @@ package generator
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/ebinskryfon/goclean/pkg/strutil"
 	"github.com/ebinskryfon/goclean/pkg/ui"
@@ -23,6 +24,19 @@ type StubData struct {
 	EntityKebab        string // e.g. "product"
 	EntityPluralSnake  string // e.g. "products"
 	EntityPluralPascal string // e.g. "Products"
+	EntityPluralCamel  string // e.g. "products"
+	EntityPluralKebab  string // e.g. "products" (used for URL paths)
+	Database           string // postgres | mysql | sqlite (from .goclean.json)
+	Router             string // gin | chi (from .goclean.json)
+	Fields             []Field
+}
+
+// Options controls how files are generated.
+type Options struct {
+	Fields     []Field
+	Force      bool // overwrite existing files
+	DryRun     bool // print what would happen without touching the disk
+	NoRegister bool // make:module: don't patch container.go / routes.go
 }
 
 // FindGoModuleName locates the nearest go.mod and extracts the module path.
@@ -74,147 +88,306 @@ func BuildStubData(moduleName, rawName string) StubData {
 		EntityKebab:        kebab,
 		EntityPluralSnake:  pluralSnake,
 		EntityPluralPascal: pluralPascal,
+		EntityPluralCamel:  strutil.ToCamelCase(pluralSnake),
+		EntityPluralKebab:  strutil.ToKebabCase(pluralSnake),
 	}
 }
 
-// renderStub renders a stub from templates/stubs and writes it to targetPath.
-func renderStub(stubName, targetPath string, data StubData) error {
-	if _, err := os.Stat(targetPath); err == nil {
-		ui.Warn("Skipped existing file: %s", targetPath)
+// runner carries options and records what happened for the final summary.
+type runner struct {
+	opts        Options
+	created     []string
+	overwritten []string
+	skipped     []string
+}
+
+// write creates or overwrites a file, honouring Force and DryRun.
+func (r *runner) write(path string, content []byte) error {
+	_, statErr := os.Stat(path)
+	exists := statErr == nil
+	if exists && !r.opts.Force {
+		r.skipped = append(r.skipped, path)
+		ui.Warn("Skipped existing file: %s", path)
 		return nil
 	}
+	verb, would, list := "Created", "create", &r.created
+	if exists {
+		verb, would, list = "Overwrote", "overwrite", &r.overwritten
+	}
+	*list = append(*list, path)
+	if r.opts.DryRun {
+		ui.Info("Would %s: %s", would, path)
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, content, 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", path, err)
+	}
+	ui.Success("%s: %s", verb, path)
+	return nil
+}
 
+// render renders a stub from templates/stubs and writes it to targetPath.
+func (r *runner) render(stubName, targetPath string, data StubData) error {
 	content, err := templates.FS.ReadFile("stubs/" + stubName)
 	if err != nil {
 		return fmt.Errorf("failed to read stub %s: %w", stubName, err)
 	}
-
 	tmpl, err := template.New(stubName).Parse(string(content))
 	if err != nil {
 		return fmt.Errorf("failed to parse stub %s: %w", stubName, err)
 	}
-
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return fmt.Errorf("failed to execute stub %s: %w", stubName, err)
 	}
-
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-		return err
-	}
-
-	if err := os.WriteFile(targetPath, buf.Bytes(), 0644); err != nil {
-		return err
-	}
-
-	ui.Success("Created: %s", targetPath)
-	return nil
+	return r.write(targetPath, buf.Bytes())
 }
 
-// GenerateModule creates all layers for a Clean Architecture feature.
-func GenerateModule(rootPath, rawName string) error {
+func (r *runner) summary() {
+	fmt.Println()
+	ui.Info("%d created, %d overwritten, %d skipped", len(r.created), len(r.overwritten), len(r.skipped))
+	if len(r.skipped) > 0 {
+		ui.Warn("Skipped files already exist; re-run with --force to overwrite them.")
+	}
+	if r.opts.DryRun {
+		ui.Info("Dry run: no files were changed.")
+	}
+}
+
+type stubFile struct{ stub, dest string }
+
+// layerFiles maps each layer name to its (stub, destination) pairs.
+func layerFiles(projectRoot string, d StubData) map[string][]stubFile {
+	j := filepath.Join
+	return map[string][]stubFile{
+		"entity": {{"entity.tmpl", j(projectRoot, "internal", "domain", "entity", d.EntitySnake+".go")}},
+		"types":  {{"types.tmpl", j(projectRoot, "internal", "types", d.EntitySnake+".go")}},
+		"repo": {
+			{"repository.tmpl", j(projectRoot, "internal", "domain", "repository", d.EntitySnake+"_repository.go")},
+			{"persistence.tmpl", j(projectRoot, "internal", "infrastructure", "persistence", d.EntitySnake+"_repository.go")},
+		},
+		"usecase": {
+			{"usecase_interface.tmpl", j(projectRoot, "internal", "usecase", "interface", d.EntitySnake+"_usecase.go")},
+			{"usecase_implementation.tmpl", j(projectRoot, "internal", "usecase", "implementation", d.EntitySnake+"_usecase.go")},
+		},
+		"handler": {{handlerStub(d), j(projectRoot, "internal", "delivery", "http", "handlers", d.EntitySnake+"_handler.go")}},
+	}
+}
+
+func handlerStub(d StubData) string {
+	if d.Router == RouterChi {
+		return "handler_chi.tmpl"
+	}
+	return "handler.tmpl"
+}
+
+// moduleOrder is the order in which layers are generated by GenerateModule.
+var moduleOrder = []string{"entity", "types", "repo", "usecase", "handler"}
+
+// loadProjectConfig reads .goclean.json; projects created before it existed are postgres + gin.
+func loadProjectConfig(projectRoot string) ProjectConfig {
+	cfg := ProjectConfig{Database: DBPostgres, Router: RouterGin}
+	if b, err := os.ReadFile(filepath.Join(projectRoot, projectConfigFile)); err == nil {
+		var parsed ProjectConfig
+		if json.Unmarshal(b, &parsed) == nil {
+			if contains(SupportedDatabases, parsed.Database) {
+				cfg.Database = parsed.Database
+			}
+			if contains(SupportedRouters, parsed.Router) {
+				cfg.Router = parsed.Router
+			}
+		}
+	}
+	return cfg
+}
+
+func prepare(rootPath, rawName string, opts Options) (StubData, string, error) {
+	if !strutil.IsValidIdentifier(rawName) {
+		return StubData{}, "", fmt.Errorf("invalid name %q: must be a valid Go identifier (letters, digits, '_' or '-', not starting with a digit)", rawName)
+	}
+	if isGoKeyword(strutil.ToCamelCase(rawName)) {
+		return StubData{}, "", fmt.Errorf("invalid name %q: %q is a Go keyword", rawName, strutil.ToCamelCase(rawName))
+	}
 	moduleName, projectRoot, err := FindGoModuleName(rootPath)
 	if err != nil {
-		return err
+		return StubData{}, "", err
 	}
-
 	data := BuildStubData(moduleName, rawName)
-
-	ui.Header(fmt.Sprintf("Generating Clean Architecture Module: %s", data.EntityPascal))
-
-	files := []struct {
-		stub string
-		dest string
-	}{
-		{"entity.tmpl", filepath.Join(projectRoot, "internal", "domain", "entity", data.EntitySnake+".go")},
-		{"types.tmpl", filepath.Join(projectRoot, "internal", "types", data.EntitySnake+".go")},
-		{"repository.tmpl", filepath.Join(projectRoot, "internal", "domain", "repository", data.EntitySnake+"_repository.go")},
-		{"persistence.tmpl", filepath.Join(projectRoot, "internal", "infrastructure", "persistence", data.EntitySnake+"_repository.go")},
-		{"usecase_interface.tmpl", filepath.Join(projectRoot, "internal", "usecase", "interface", data.EntitySnake+"_usecase.go")},
-		{"usecase_implementation.tmpl", filepath.Join(projectRoot, "internal", "usecase", "implementation", data.EntitySnake+"_usecase.go")},
-		{"handler.tmpl", filepath.Join(projectRoot, "internal", "delivery", "http", "handlers", data.EntitySnake+"_handler.go")},
+	cfg := loadProjectConfig(projectRoot)
+	data.Database, data.Router = cfg.Database, cfg.Router
+	data.Fields = make([]Field, len(opts.Fields))
+	for i, f := range opts.Fields {
+		f.SQLType = sqlTypeFor(cfg.Database, f.Type)
+		data.Fields[i] = f
 	}
+	return data, projectRoot, nil
+}
 
-	for _, f := range files {
-		if err := renderStub(f.stub, f.dest, data); err != nil {
+func (r *runner) renderLayer(projectRoot, layer string, data StubData) error {
+	for _, f := range layerFiles(projectRoot, data)[layer] {
+		if err := r.render(f.stub, f.dest, data); err != nil {
 			return err
 		}
 	}
+	return nil
+}
 
-	// Generate migration
-	timestamp := time.Now().Format("20060102150405")
-	upMigration := filepath.Join(projectRoot, "migrations", fmt.Sprintf("%s_create_%s_table.up.sql", timestamp, data.EntityPluralSnake))
-	downMigration := filepath.Join(projectRoot, "migrations", fmt.Sprintf("%s_create_%s_table.down.sql", timestamp, data.EntityPluralSnake))
+// nextMigrationNumber returns the next sequential migration number (max existing numeric prefix + 1).
+func nextMigrationNumber(dir string) int {
+	max := 0
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		prefix, _, _ := strings.Cut(e.Name(), "_")
+		if n, err := strconv.Atoi(prefix); err == nil && n > max {
+			max = n
+		}
+	}
+	return max + 1
+}
 
-	if err := renderStub("migration.tmpl", upMigration, data); err != nil {
+// renderMigration writes sequentially numbered up/down migration files.
+func (r *runner) renderMigration(projectRoot string, data StubData) error {
+	dir := filepath.Join(projectRoot, "migrations")
+	base := filepath.Join(dir, fmt.Sprintf("%06d_create_%s_table", nextMigrationNumber(dir), data.EntityPluralSnake))
+	if err := r.render("migration.tmpl", base+".up.sql", data); err != nil {
 		return err
 	}
+	return r.write(base+".down.sql", []byte(fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", data.EntityPluralSnake)))
+}
 
-	downSQL := fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", data.EntityPluralSnake)
-	_ = os.WriteFile(downMigration, []byte(downSQL), 0644)
-	ui.Success("Created: %s", downMigration)
+// register patches container.go and routes.go. It returns true when both were handled
+// (patched or already registered); false means the caller should print manual steps.
+func (r *runner) register(projectRoot string, d StubData) bool {
+	container := filepath.Join(projectRoot, "internal", "infrastructure", "container", "container.go")
+	routes := filepath.Join(projectRoot, "internal", "delivery", "http", "routes.go")
 
+	cPatches := []patch{
+		{markerHandlerFields, fmt.Sprintf("%sHandler *handlers.%sHandler", d.EntityPascal, d.EntityPascal)},
+		{markerRepositories, fmt.Sprintf("%sRepo := persistence.New%sRepository(db)", d.EntityCamel, d.EntityPascal)},
+		{markerUsecases, fmt.Sprintf("%sUsecase := usecaseimpl.New%sUsecase(%sRepo)", d.EntityCamel, d.EntityPascal, d.EntityCamel)},
+		{markerHandlers, fmt.Sprintf("%sHandler := handlers.New%sHandler(%sUsecase)", d.EntityCamel, d.EntityPascal, d.EntityCamel)},
+		{markerHandlerInit, fmt.Sprintf("%sHandler: %sHandler,", d.EntityPascal, d.EntityCamel)},
+	}
+	v, p, k := d.EntityPluralCamel, d.EntityPascal, d.EntityPluralKebab
+	routeKey := fmt.Sprintf(`v1.Group("/%s")`, k)
+	routeSnippet := fmt.Sprintf(`%[1]s := v1.Group("/%[3]s")
+{
+	%[1]s.POST("", c.%[2]sHandler.Create)
+	%[1]s.GET("", c.%[2]sHandler.List)
+	%[1]s.GET("/:id", c.%[2]sHandler.GetByID)
+	%[1]s.PUT("/:id", c.%[2]sHandler.Update)
+	%[1]s.DELETE("/:id", c.%[2]sHandler.Delete)
+}
+`, v, p, k)
+	if d.Router == RouterChi {
+		routeKey = fmt.Sprintf(`v1.Route("/%s"`, k)
+		routeSnippet = fmt.Sprintf(`v1.Route("/%[2]s", func(r chi.Router) {
+	r.Post("/", c.%[1]sHandler.Create)
+	r.Get("/", c.%[1]sHandler.List)
+	r.Get("/{id}", c.%[1]sHandler.GetByID)
+	r.Put("/{id}", c.%[1]sHandler.Update)
+	r.Delete("/{id}", c.%[1]sHandler.Delete)
+})
+`, p, k)
+	}
+	rPatches := []patch{{markerRoutes, routeSnippet}}
+
+	ok := true
+	for _, step := range []struct {
+		path, key, what string
+		patches         []patch
+	}{
+		{container, fmt.Sprintf("handlers.New%sHandler(", d.EntityPascal), "container.go", cPatches},
+		{routes, routeKey, "routes.go", rPatches},
+	} {
+		applied, skipped, err := r.applyPatches(step.path, step.key, step.patches)
+		switch {
+		case err != nil:
+			ui.Warn("Could not patch %s: %v", step.what, err)
+			ok = false
+		case skipped:
+			ui.Warn("%s already registers %s; left unchanged", step.what, d.EntityPascal)
+		case applied:
+			ui.Success("Registered %s in %s", d.EntityPascal, step.what)
+		default:
+			ui.Warn("Could not patch %s (missing goclean markers)", step.what)
+			ok = false
+		}
+	}
+	return ok
+}
+
+func printManualSteps(projectRoot string, d StubData) {
 	fmt.Println()
 	ui.Info("Next steps to register the module:")
 	fmt.Printf("  1. In %s/internal/infrastructure/container/container.go:\n", projectRoot)
-	fmt.Printf("     %sRepo := persistence.New%sRepository(db)\n", data.EntityCamel, data.EntityPascal)
-	fmt.Printf("     %sUsecase := usecaseimpl.New%sUsecase(%sRepo)\n", data.EntityCamel, data.EntityPascal, data.EntityCamel)
-	fmt.Printf("     %sHandler := handlers.New%sHandler(%sUsecase)\n\n", data.EntityCamel, data.EntityPascal, data.EntityCamel)
+	fmt.Printf("     %sRepo := persistence.New%sRepository(db)\n", d.EntityCamel, d.EntityPascal)
+	fmt.Printf("     %sUsecase := usecaseimpl.New%sUsecase(%sRepo)\n", d.EntityCamel, d.EntityPascal, d.EntityCamel)
+	fmt.Printf("     %sHandler := handlers.New%sHandler(%sUsecase)\n\n", d.EntityCamel, d.EntityPascal, d.EntityCamel)
 	fmt.Printf("  2. In %s/internal/delivery/http/routes.go:\n", projectRoot)
-	fmt.Printf("     %s := v1.Group(\"/%s\")\n", data.EntityPluralSnake, data.EntityPluralSnake)
-	fmt.Printf("     %s.POST(\"\", c.%sHandler.Create)\n", data.EntityPluralSnake, data.EntityPascal)
-	fmt.Printf("     %s.GET(\"\", c.%sHandler.List)\n", data.EntityPluralSnake, data.EntityPascal)
-	fmt.Printf("     %s.GET(\"/:id\", c.%sHandler.GetByID)\n", data.EntityPluralSnake, data.EntityPascal)
-	fmt.Printf("     %s.DELETE(\"/:id\", c.%sHandler.Delete)\n\n", data.EntityPluralSnake, data.EntityPascal)
-
-	return nil
+	g := d.EntityPluralCamel
+	fmt.Printf("     %s := v1.Group(\"/%s\")\n", g, d.EntityPluralKebab)
+	fmt.Printf("     %s.POST(\"\", c.%sHandler.Create)\n", g, d.EntityPascal)
+	fmt.Printf("     %s.GET(\"\", c.%sHandler.List)\n", g, d.EntityPascal)
+	fmt.Printf("     %s.GET(\"/:id\", c.%sHandler.GetByID)\n", g, d.EntityPascal)
+	fmt.Printf("     %s.PUT(\"/:id\", c.%sHandler.Update)\n", g, d.EntityPascal)
+	fmt.Printf("     %s.DELETE(\"/:id\", c.%sHandler.Delete)\n\n", g, d.EntityPascal)
 }
 
-// GenerateSingleLayer generates an isolated layer (entity, repo, usecase, handler, or migration).
-func GenerateSingleLayer(rootPath, layerType, rawName string) error {
-	moduleName, projectRoot, err := FindGoModuleName(rootPath)
+// GenerateModule creates all layers for a Clean Architecture feature and registers it.
+func GenerateModule(rootPath, rawName string, opts Options) error {
+	data, projectRoot, err := prepare(rootPath, rawName, opts)
 	if err != nil {
 		return err
 	}
+	r := &runner{opts: opts}
 
-	data := BuildStubData(moduleName, rawName)
+	ui.Header(fmt.Sprintf("Generating Clean Architecture Module: %s", data.EntityPascal))
 
-	switch strings.ToLower(layerType) {
-	case "entity":
-		dest := filepath.Join(projectRoot, "internal", "domain", "entity", data.EntitySnake+".go")
-		return renderStub("entity.tmpl", dest, data)
-	case "types", "type", "dto":
-		dest := filepath.Join(projectRoot, "internal", "types", data.EntitySnake+".go")
-		return renderStub("types.tmpl", dest, data)
-	case "repo", "repository":
-		dest1 := filepath.Join(projectRoot, "internal", "domain", "repository", data.EntitySnake+"_repository.go")
-		dest2 := filepath.Join(projectRoot, "internal", "infrastructure", "persistence", data.EntitySnake+"_repository.go")
-		if err := renderStub("repository.tmpl", dest1, data); err != nil {
+	for _, layer := range moduleOrder {
+		if err := r.renderLayer(projectRoot, layer, data); err != nil {
 			return err
 		}
-		return renderStub("persistence.tmpl", dest2, data)
-	case "usecase":
-		dest1 := filepath.Join(projectRoot, "internal", "usecase", "interface", data.EntitySnake+"_usecase.go")
-		dest2 := filepath.Join(projectRoot, "internal", "usecase", "implementation", data.EntitySnake+"_usecase.go")
-		if err := renderStub("usecase_interface.tmpl", dest1, data); err != nil {
-			return err
-		}
-		return renderStub("usecase_implementation.tmpl", dest2, data)
-	case "handler":
-		dest := filepath.Join(projectRoot, "internal", "delivery", "http", "handlers", data.EntitySnake+"_handler.go")
-		return renderStub("handler.tmpl", dest, data)
-	case "migration":
-		timestamp := time.Now().Format("20060102150405")
-		upDest := filepath.Join(projectRoot, "migrations", fmt.Sprintf("%s_create_%s_table.up.sql", timestamp, data.EntityPluralSnake))
-		downDest := filepath.Join(projectRoot, "migrations", fmt.Sprintf("%s_create_%s_table.down.sql", timestamp, data.EntityPluralSnake))
-		if err := renderStub("migration.tmpl", upDest, data); err != nil {
-			return err
-		}
-		downSQL := fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", data.EntityPluralSnake)
-		_ = os.WriteFile(downDest, []byte(downSQL), 0644)
-		ui.Success("Created: %s", downDest)
-		return nil
-	default:
+	}
+	if err := r.renderMigration(projectRoot, data); err != nil {
+		return err
+	}
+
+	if opts.NoRegister || !r.register(projectRoot, data) {
+		printManualSteps(projectRoot, data)
+	}
+	r.summary()
+	return nil
+}
+
+// GenerateSingleLayer generates an isolated layer (entity, types, repo, usecase, handler, or migration).
+func GenerateSingleLayer(rootPath, layerType, rawName string, opts Options) error {
+	data, projectRoot, err := prepare(rootPath, rawName, opts)
+	if err != nil {
+		return err
+	}
+	r := &runner{opts: opts}
+
+	layer := strings.ToLower(layerType)
+	switch layer {
+	case "type", "dto":
+		layer = "types"
+	case "repository":
+		layer = "repo"
+	}
+	if layer == "migration" {
+		err = r.renderMigration(projectRoot, data)
+	} else if _, ok := layerFiles(projectRoot, data)[layer]; ok {
+		err = r.renderLayer(projectRoot, layer, data)
+	} else {
 		return fmt.Errorf("unknown layer type: %s", layerType)
 	}
+	if err != nil {
+		return err
+	}
+	r.summary()
+	return nil
 }

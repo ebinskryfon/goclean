@@ -1,3 +1,42 @@
+{{- if eq .Router "chi"}}
+package http
+
+import (
+	nethttp "net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog"
+	"{{.ModuleName}}/config"
+	"{{.ModuleName}}/internal/delivery/http/middleware"
+	"{{.ModuleName}}/internal/infrastructure/container"
+)
+
+func SetupRouter(cfg *config.Config, log zerolog.Logger, c *container.AppContainer) nethttp.Handler {
+	r := chi.NewRouter()
+
+	// Global Middlewares
+	r.Use(middleware.RequestID())
+	r.Use(middleware.Logger(log))
+	r.Use(middleware.Recovery(log))
+	r.Use(middleware.CORS())
+
+	// Health Check endpoint
+	r.Get("/health", c.HealthHandler.Check)
+
+	// API v1 group
+	r.Route("/api/v1", func(v1 chi.Router) {
+		v1.Route("/users", func(r chi.Router) {
+			r.Post("/", c.UserHandler.Register)
+			r.Get("/", c.UserHandler.List)
+			r.Get("/{id}", c.UserHandler.GetByID)
+		})
+
+		// goclean:routes
+	})
+
+	return r
+}
+{{- else}}
 package http
 
 import (
@@ -33,7 +72,10 @@ func SetupRouter(cfg *config.Config, log zerolog.Logger, c *container.AppContain
 			users.GET("", c.UserHandler.List)
 			users.GET("/:id", c.UserHandler.GetByID)
 		}
+
+		// goclean:routes
 	}
 
 	return r
 }
+{{- end}}

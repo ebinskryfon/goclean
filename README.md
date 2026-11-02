@@ -8,7 +8,7 @@ Bakes in enterprise-tested architecture from real-world Go backend production sy
 
 ## ⚡ Worldwide Installation
 
-Anyone with Go 1.22+ installed can install `goclean` globally with one command:
+Anyone with Go 1.22+ (generated projects target Go 1.23 and Go will fetch that toolchain automatically) installed can install `goclean` globally with one command:
 
 ```bash
 go install github.com/ebinskryfon/goclean@latest
@@ -31,7 +31,18 @@ goclean new my-saas
 
 # Or non-interactive with flags
 goclean new my-saas --module github.com/username/my-saas --db saas_db
+
+# Pick the stack (defaults: gin + postgres)
+goclean new my-api --router chi --database sqlite
+goclean new my-shop --router gin --database mysql
 ```
+
+| Flag | Values | Notes |
+|------|--------|-------|
+| `--router` | `gin` (default), `chi` | chi uses plain `net/http` handlers; request validation uses the same `binding:"..."` tags |
+| `--database` | `postgres` (default), `mysql`, `sqlite` | SQLite is pure Go (no cgo) and skips `docker-compose.yml` |
+
+The choice is saved in `.goclean.json`, so `make:*` generators emit matching handlers, routes, SQL types and migrations.
 
 This bootstraps a complete Clean Architecture project in seconds:
 - ✅ Scaffolds full Go Clean Architecture (Domain, Usecase, Delivery, Infrastructure)
@@ -61,8 +72,36 @@ This creates:
 - `internal/usecase/interface/product_usecase.go`
 - `internal/usecase/implementation/product_usecase.go`
 - `internal/delivery/http/handlers/product_handler.go`
-- `migrations/<timestamp>_create_products_table.up.sql`
-- `migrations/<timestamp>_create_products_table.down.sql`
+- `migrations/<NNNNNN>_create_products_table.up.sql`
+- `migrations/<NNNNNN>_create_products_table.down.sql`
+
+#### Define fields (`name:type`)
+```bash
+goclean make:module Product name:string price:float stock:int active:bool
+```
+Fields flow into the entity, DTOs (create/update/response), usecase, handler and migration columns.
+Types: `string`, `text`, `int`, `int64`, `float`, `bool`, `time`, `uuid` (default `string`).
+Update requests use pointers, so omitted fields stay unchanged.
+
+#### Auto-registration
+`make:module` patches `container.go` and `routes.go` through the `// goclean:*` marker comments in
+projects created by `goclean new`. It is idempotent. Use `--no-register` to skip it; for older projects
+without markers it prints the manual steps instead.
+
+#### Common flags
+| Flag | Applies to | Effect |
+|------|-----------|--------|
+| `--force` | all generators, `new` | overwrite existing files (`new`: allow a non-empty directory) |
+| `--dry-run` | all generators, `new` | list what would be written, change nothing |
+| `--no-register` | `make:module` | don't patch container/routes |
+| `--no-git`, `--no-tidy` | `new` | skip `git init` / `go mod tidy` |
+
+Every run ends with a created / overwritten / skipped summary.
+
+#### Check your environment
+```bash
+goclean doctor   # verifies Go 1.22+, git and docker
+```
 
 #### Granular Generators
 ```bash
@@ -159,3 +198,18 @@ Contributions, issues, and feature requests are welcome!
 ## 📄 License
 
 MIT License.
+
+
+---
+
+## 🧪 Development & Releases
+
+```bash
+make test    # unit tests
+make smoke   # scaffold a project, add a module, go build (needs network)
+make build   # ./bin/goclean with the version stamped in
+```
+
+CI (`.github/workflows/ci.yml`) runs format, vet, tests and the smoke test. Pushing a `v*` tag runs GoReleaser
+(`.goreleaser.yaml`) to publish binaries. `go install github.com/ebinskryfon/goclean@vX.Y.Z` reports its
+module version automatically.

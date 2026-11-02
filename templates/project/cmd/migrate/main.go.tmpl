@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/database/{{.Database}}"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"{{.ModuleName}}/config"
 )
@@ -24,6 +24,18 @@ func main() {
 		os.Exit(1)
 	}
 
+{{- if eq .Database "mysql"}}
+	dsn := fmt.Sprintf(
+		"mysql://%s:%s@tcp(%s:%s)/%s?multiStatements=true",
+		cfg.Database.User,
+		cfg.Database.Password,
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.Name,
+	)
+{{- else if eq .Database "sqlite"}}
+	dsn := "sqlite://" + cfg.Database.Name
+{{- else}}
 	dsn := fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		cfg.Database.User,
@@ -33,6 +45,7 @@ func main() {
 		cfg.Database.Name,
 		cfg.Database.SSLMode,
 	)
+{{- end}}
 
 	m, err := migrate.New("file://migrations", dsn)
 	if err != nil {

@@ -4,22 +4,26 @@ Generated with [goclean](https://github.com/ebinskryfon/goclean) — Go Clean Ar
 
 ## Requirements
 
-- Go 1.22+
-- Docker & Docker Compose (for local PostgreSQL)
+- Go 1.23+
+{{- if ne .Database "sqlite"}}
+- Docker & Docker Compose (for local {{if eq .Database "mysql"}}MySQL{{else}}PostgreSQL{{end}})
+{{- end}}
+
+Stack: {{.Router}} router, {{.Database}} database (GORM).
 
 ## Getting Started
 
-1. **Start the database:**
+{{if ne .Database "sqlite"}}1. **Start the database:**
    ```bash
    docker compose up -d
    ```
 
-2. **Run migrations:**
+2. {{else}}1. {{end}}**Run migrations:**
    ```bash
    make migrate
    ```
 
-3. **Run development server with hot-reload:**
+{{if ne .Database "sqlite"}}3.{{else}}2.{{end}} **Run development server with hot-reload:**
    ```bash
    make dev
    ```
@@ -28,7 +32,7 @@ Generated with [goclean](https://github.com/ebinskryfon/goclean) — Go Clean Ar
    make run
    ```
 
-4. **Verify it works:**
+{{if ne .Database "sqlite"}}4.{{else}}3.{{end}} **Verify it works:**
    ```bash
    curl http://localhost:8080/health
    ```
@@ -50,7 +54,7 @@ Generated with [goclean](https://github.com/ebinskryfon/goclean) — Go Clean Ar
 │   │   └── service/         # Domain service contracts
 │   ├── infrastructure/
 │   │   ├── container/       # Dependency injection container
-│   │   ├── database/        # GORM PostgreSQL connection pool & fail-fast
+│   │   ├── database/        # GORM connection pool & fail-fast
 │   │   ├── persistence/     # Repository database implementations
 │   │   └── server/          # HTTP server lifecycle
 │   ├── types/               # Request, Input, and Response DTO types

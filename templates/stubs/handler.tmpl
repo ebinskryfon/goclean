@@ -27,7 +27,17 @@ func (h *{{.EntityPascal}}Handler) Create(c *gin.Context) {
 		return
 	}
 
-	item, err := h.usecase.Create(c.Request.Context(), types.Create{{.EntityPascal}}Input{})
+{{- if not .Fields}}
+	_ = req // TODO: remove once request fields are mapped below
+{{- end}}
+	item, err := h.usecase.Create(c.Request.Context(), types.Create{{.EntityPascal}}Input{
+{{- range .Fields}}
+		{{.Pascal}}: req.{{.Pascal}},
+{{- end}}
+{{- if not .Fields}}
+		// TODO: map fields from req, e.g. Name: req.Name,
+{{- end}}
+	})
 	if err != nil {
 		response.Internal(c, "failed to create {{.EntitySnake}}")
 		return
@@ -99,4 +109,41 @@ func (h *{{.EntityPascal}}Handler) Delete(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"deleted": true})
+}
+
+func (h *{{.EntityPascal}}Handler) Update(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.BadRequest(c, "invalid uuid format")
+		return
+	}
+
+	var req types.Update{{.EntityPascal}}Request
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+{{- if not .Fields}}
+	_ = req // TODO: remove once request fields are mapped below
+{{- end}}
+	item, err := h.usecase.Update(c.Request.Context(), types.Update{{.EntityPascal}}Input{
+		ID: id,
+{{- range .Fields}}
+		{{.Pascal}}: req.{{.Pascal}},
+{{- end}}
+{{- if not .Fields}}
+		// TODO: map fields from req
+{{- end}}
+	})
+	if err != nil {
+		if errors.Is(err, domainerrors.ErrNotFound) {
+			response.NotFound(c, "{{.EntitySnake}} not found")
+			return
+		}
+		response.Internal(c, "failed to update {{.EntitySnake}}")
+		return
+	}
+
+	response.Success(c, types.To{{.EntityPascal}}Response(item))
 }

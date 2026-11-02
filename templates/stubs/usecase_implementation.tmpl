@@ -23,6 +23,9 @@ func (u *{{.EntityCamel}}Usecase) Create(ctx context.Context, input types.Create
 	now := time.Now().UTC()
 	item := &entity.{{.EntityPascal}}{
 		ID:        uuid.New(),
+{{- range .Fields}}
+		{{.Pascal}}: input.{{.Pascal}},
+{{- end}}
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -48,6 +51,29 @@ func (u *{{.EntityCamel}}Usecase) List(ctx context.Context, page, pageSize int) 
 	offset := (page - 1) * pageSize
 
 	return u.repo.List(ctx, pageSize, offset)
+}
+
+func (u *{{.EntityCamel}}Usecase) Update(ctx context.Context, input types.Update{{.EntityPascal}}Input) (*entity.{{.EntityPascal}}, error) {
+	item, err := u.repo.GetByID(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+{{- range .Fields}}
+	if input.{{.Pascal}} != nil {
+		item.{{.Pascal}} = *input.{{.Pascal}}
+	}
+{{- end}}
+{{- if not .Fields}}
+	// TODO: apply input fields to item
+{{- end}}
+	item.UpdatedAt = time.Now().UTC()
+
+	if err := u.repo.Update(ctx, item); err != nil {
+		return nil, err
+	}
+
+	return item, nil
 }
 
 func (u *{{.EntityCamel}}Usecase) Delete(ctx context.Context, id uuid.UUID) error {

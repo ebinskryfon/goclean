@@ -8,15 +8,21 @@ import (
 	"time"
 
 	"{{.ModuleName}}/config"
+{{- if eq .Database "mysql"}}
+	"gorm.io/driver/mysql"
+{{- else if eq .Database "sqlite"}}
+	"github.com/glebarez/sqlite"
+{{- else}}
 	"gorm.io/driver/postgres"
+{{- end}}
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-// DefaultConnTimeout is the default bounded timeout for verifying PostgreSQL connectivity.
+// DefaultConnTimeout is the default bounded timeout for verifying database connectivity.
 const DefaultConnTimeout = 5 * time.Second
 
-// Connect initializes a GORM PostgreSQL connection pool and verifies database reachability.
+// Connect initializes a GORM {{if eq .Database "mysql"}}MySQL{{else if eq .Database "sqlite"}}SQLite{{else}}PostgreSQL{{end}} connection pool and verifies database reachability.
 func Connect(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	dsn := cfg.DSN()
 
@@ -24,7 +30,7 @@ func Connect(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		Logger: logger.Default.LogMode(logger.Silent),
 	}
 
-	db, err := gorm.Open(postgres.Open(dsn), gormConfig)
+	db, err := gorm.Open({{if eq .Database "mysql"}}mysql{{else if eq .Database "sqlite"}}sqlite{{else}}postgres{{end}}.Open(dsn), gormConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -35,6 +41,10 @@ func Connect(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	}
 
 	configureConnectionPool(sqlDB, cfg)
+{{- if eq .Database "sqlite"}}
+	// SQLite allows a single writer; one connection avoids "database is locked" errors.
+	sqlDB.SetMaxOpenConns(1)
+{{- end}}
 
 	timeout := cfg.ConnTimeout
 	if timeout <= 0 {

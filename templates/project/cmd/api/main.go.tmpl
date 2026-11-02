@@ -37,7 +37,7 @@ func main() {
 	}
 	defer sqlDB.Close()
 
-	log.Info().Msg("connected to postgres database")
+	log.Info().Msg("connected to database")
 
 	// Wire dependency injection container
 	appContainer, err := container.New(cfg, db, sqlDB, log)

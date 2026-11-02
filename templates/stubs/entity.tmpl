@@ -4,11 +4,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type {{.EntityPascal}} struct {
-	ID        uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	ID        uuid.UUID  `json:"id" gorm:"{{if eq .Database "mysql"}}type:char(36);primaryKey{{else if eq .Database "sqlite"}}type:text;primaryKey{{else}}type:uuid;primary_key;default:gen_random_uuid(){{end}}"`
+{{- range .Fields}}
+	{{.Pascal}} {{.GoType}} `json:"{{.Snake}}" gorm:"{{.GormTag}}"`
+{{- end}}
 	CreatedAt time.Time  `json:"created_at" gorm:"not null"`
 	UpdatedAt time.Time  `json:"updated_at" gorm:"not null"`
-	DeletedAt *time.Time `json:"-" gorm:"index"`
+	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
 }

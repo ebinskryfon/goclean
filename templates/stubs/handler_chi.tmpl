@@ -1,0 +1,147 @@
+package handlers
+
+import (
+	"errors"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	domainerrors "{{.ModuleName}}/internal/domain/errors"
+	"{{.ModuleName}}/internal/delivery/http/response"
+	"{{.ModuleName}}/internal/types"
+	usecase "{{.ModuleName}}/internal/usecase/interface"
+)
+
+type {{.EntityPascal}}Handler struct {
+	usecase usecase.{{.EntityPascal}}Usecase
+}
+
+func New{{.EntityPascal}}Handler(usecase usecase.{{.EntityPascal}}Usecase) *{{.EntityPascal}}Handler {
+	return &{{.EntityPascal}}Handler{usecase: usecase}
+}
+
+func (h *{{.EntityPascal}}Handler) Create(w http.ResponseWriter, r *http.Request) {
+	var req types.Create{{.EntityPascal}}Request
+	if err := response.Bind(r, &req); err != nil {
+		response.BadRequest(w, err.Error())
+		return
+	}
+
+{{- if not .Fields}}
+	_ = req // TODO: remove once request fields are mapped below
+{{- end}}
+	item, err := h.usecase.Create(r.Context(), types.Create{{.EntityPascal}}Input{
+{{- range .Fields}}
+		{{.Pascal}}: req.{{.Pascal}},
+{{- end}}
+{{- if not .Fields}}
+		// TODO: map fields from req, e.g. Name: req.Name,
+{{- end}}
+	})
+	if err != nil {
+		response.Internal(w, "failed to create {{.EntitySnake}}")
+		return
+	}
+
+	response.Created(w, types.To{{.EntityPascal}}Response(item))
+}
+
+func (h *{{.EntityPascal}}Handler) GetByID(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.BadRequest(w, "invalid uuid format")
+		return
+	}
+
+	item, err := h.usecase.GetByID(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, domainerrors.ErrNotFound) {
+			response.NotFound(w, "{{.EntitySnake}} not found")
+			return
+		}
+		response.Internal(w, "failed to retrieve {{.EntitySnake}}")
+		return
+	}
+
+	response.Success(w, types.To{{.EntityPascal}}Response(item))
+}
+
+func (h *{{.EntityPascal}}Handler) List(w http.ResponseWriter, r *http.Request) {
+	page := response.QueryInt(r, "page", 1)
+	pageSize := response.QueryInt(r, "page_size", 20)
+
+	items, total, err := h.usecase.List(r.Context(), page, pageSize)
+	if err != nil {
+		response.Internal(w, "failed to list {{.EntityPluralSnake}}")
+		return
+	}
+
+	respItems := make([]types.{{.EntityPascal}}Response, 0, len(items))
+	for _, item := range items {
+		respItems = append(respItems, types.To{{.EntityPascal}}Response(item))
+	}
+
+	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
+	response.Paginated(w, respItems, response.Meta{
+		Page:       page,
+		PageSize:   pageSize,
+		TotalItems: total,
+		TotalPages: totalPages,
+	})
+}
+
+func (h *{{.EntityPascal}}Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.BadRequest(w, "invalid uuid format")
+		return
+	}
+
+	if err := h.usecase.Delete(r.Context(), id); err != nil {
+		if errors.Is(err, domainerrors.ErrNotFound) {
+			response.NotFound(w, "{{.EntitySnake}} not found")
+			return
+		}
+		response.Internal(w, "failed to delete {{.EntitySnake}}")
+		return
+	}
+
+	response.Success(w, map[string]bool{"deleted": true})
+}
+
+func (h *{{.EntityPascal}}Handler) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.BadRequest(w, "invalid uuid format")
+		return
+	}
+
+	var req types.Update{{.EntityPascal}}Request
+	if err := response.Bind(r, &req); err != nil {
+		response.BadRequest(w, err.Error())
+		return
+	}
+
+{{- if not .Fields}}
+	_ = req // TODO: remove once request fields are mapped below
+{{- end}}
+	item, err := h.usecase.Update(r.Context(), types.Update{{.EntityPascal}}Input{
+		ID: id,
+{{- range .Fields}}
+		{{.Pascal}}: req.{{.Pascal}},
+{{- end}}
+{{- if not .Fields}}
+		// TODO: map fields from req
+{{- end}}
+	})
+	if err != nil {
+		if errors.Is(err, domainerrors.ErrNotFound) {
+			response.NotFound(w, "{{.EntitySnake}} not found")
+			return
+		}
+		response.Internal(w, "failed to update {{.EntitySnake}}")
+		return
+	}
+
+	response.Success(w, types.To{{.EntityPascal}}Response(item))
+}

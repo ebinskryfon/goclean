@@ -37,3 +37,23 @@ func TestCases(t *testing.T) {
 		}
 	}
 }
+
+func TestPluralizeIrregular(t *testing.T) {
+	cases := map[string]string{
+		"person": "people", "Person": "People", "admin_person": "admin_people",
+		"status": "statuses", "box": "boxes", "day": "days", "category": "categories",
+	}
+	for in, want := range cases {
+		if got := Pluralize(in); got != want {
+			t.Errorf("Pluralize(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestIsValidIdentifier(t *testing.T) {
+	for in, want := range map[string]bool{"Product": true, "order_item": true, "": false, "---": false, "1abc": false, "a$b": false} {
+		if got := IsValidIdentifier(in); got != want {
+			t.Errorf("IsValidIdentifier(%q) = %v, want %v", in, got, want)
+		}
+	}
+}

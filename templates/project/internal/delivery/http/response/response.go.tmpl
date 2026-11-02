@@ -1,3 +1,124 @@
+{{- if eq .Router "chi"}}
+// Package response provides the standardized JSON envelope and error helpers.
+package response
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+
+	"github.com/go-playground/validator/v10"
+)
+
+// Envelope is the standard JSON response shape returned by every endpoint.
+type Envelope struct {
+	Success bool        `json:"success"`
+	Data    interface{} `json:"data,omitempty"`
+	Error   *ErrorInfo  `json:"error,omitempty"`
+	Meta    *Meta       `json:"meta,omitempty"`
+}
+
+type ErrorInfo struct {
+	Code    string      `json:"code"`
+	Message string      `json:"message"`
+	Details interface{} `json:"details,omitempty"`
+}
+
+type Meta struct {
+	Page       int   `json:"page"`
+	PageSize   int   `json:"page_size"`
+	TotalItems int64 `json:"total_items"`
+	TotalPages int   `json:"total_pages"`
+}
+
+// validate honours the same `binding:"..."` struct tags used elsewhere in the project.
+var validate = func() *validator.Validate {
+	v := validator.New()
+	v.SetTagName("binding")
+	return v
+}()
+
+// Bind decodes a JSON request body into dst and validates it using `binding` tags.
+func Bind(r *http.Request, dst interface{}) error {
+	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20))
+	if err := dec.Decode(dst); err != nil {
+		if errors.Is(err, io.EOF) {
+			return errors.New("request body is empty")
+		}
+		return fmt.Errorf("invalid JSON: %w", err)
+	}
+	return validate.Struct(dst)
+}
+
+// QueryInt reads an integer query parameter, returning def when missing or invalid.
+func QueryInt(r *http.Request, key string, def int) int {
+	if n, err := strconv.Atoi(r.URL.Query().Get(key)); err == nil {
+		return n
+	}
+	return def
+}
+
+func write(w http.ResponseWriter, statusCode int, body Envelope) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+func Success(w http.ResponseWriter, data interface{}) {
+	JSON(w, http.StatusOK, data)
+}
+
+func Created(w http.ResponseWriter, data interface{}) {
+	JSON(w, http.StatusCreated, data)
+}
+
+func JSON(w http.ResponseWriter, statusCode int, data interface{}) {
+	write(w, statusCode, Envelope{Success: true, Data: data})
+}
+
+func Paginated(w http.ResponseWriter, data interface{}, meta Meta) {
+	write(w, http.StatusOK, Envelope{Success: true, Data: data, Meta: &meta})
+}
+
+func Error(w http.ResponseWriter, statusCode int, code, message string) {
+	write(w, statusCode, Envelope{Success: false, Error: &ErrorInfo{Code: code, Message: message}})
+}
+
+func ErrorWithDetails(w http.ResponseWriter, statusCode int, code, message string, details interface{}) {
+	write(w, statusCode, Envelope{Success: false, Error: &ErrorInfo{Code: code, Message: message, Details: details}})
+}
+
+func BadRequest(w http.ResponseWriter, message string) {
+	Error(w, http.StatusBadRequest, "BAD_REQUEST", message)
+}
+
+func NotFound(w http.ResponseWriter, message string) {
+	Error(w, http.StatusNotFound, "NOT_FOUND", message)
+}
+
+func Unauthorized(w http.ResponseWriter, message string) {
+	Error(w, http.StatusUnauthorized, "UNAUTHORIZED", message)
+}
+
+func Forbidden(w http.ResponseWriter, message string) {
+	Error(w, http.StatusForbidden, "FORBIDDEN", message)
+}
+
+func Conflict(w http.ResponseWriter, message string) {
+	Error(w, http.StatusConflict, "CONFLICT", message)
+}
+
+func Internal(w http.ResponseWriter, message string) {
+	Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", message)
+}
+
+func ServiceUnavailable(w http.ResponseWriter, message string) {
+	Error(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", message)
+}
+{{- else}}
 // Package response provides the standardized JSON envelope and error helpers.
 package response
 
@@ -99,3 +220,4 @@ func Internal(c *gin.Context, message string) {
 func ServiceUnavailable(c *gin.Context, message string) {
 	Error(c, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", message)
 }
+{{- end}}

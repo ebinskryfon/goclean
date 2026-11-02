@@ -4,3 +4,4 @@ tmp/
 *.exe
 *.test
 .DS_Store
+dist/

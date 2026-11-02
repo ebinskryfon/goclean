@@ -5,7 +5,8 @@ import (
 	"os"
 )
 
-const (
+// Color codes. They are emptied when output is not a terminal or NO_COLOR is set.
+var (
 	Reset  = "\033[0m"
 	Bold   = "\033[1m"
 	Dim    = "\033[2m"
@@ -17,6 +18,16 @@ const (
 	Cyan   = "\033[36m"
 	White  = "\033[37m"
 )
+
+func init() {
+	_, noColor := os.LookupEnv("NO_COLOR")
+	if fi, err := os.Stdout.Stat(); err != nil || fi.Mode()&os.ModeCharDevice == 0 {
+		noColor = true
+	}
+	if noColor {
+		Reset, Bold, Dim, Red, Green, Yellow, Blue, Purple, Cyan, White = "", "", "", "", "", "", "", "", "", ""
+	}
+}
 
 // Banner prints the stylish ASCII art header.
 func Banner(version string) {

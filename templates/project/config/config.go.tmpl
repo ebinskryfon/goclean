@@ -46,11 +46,22 @@ type DatabaseConfig struct {
 	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
 }
 
+// DSN returns the driver connection string for the configured database.
 func (d DatabaseConfig) DSN() string {
+{{- if eq .Database "mysql"}}
+	return fmt.Sprintf(
+		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=UTC",
+		d.User, d.Password, d.Host, d.Port, d.Name,
+	)
+{{- else if eq .Database "sqlite"}}
+	// For SQLite, DB_NAME is the database file path.
+	return d.Name
+{{- else}}
 	return fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		d.Host, d.Port, d.User, d.Password, d.Name, d.SSLMode,
 	)
+{{- end}}
 }
 
 type JWTConfig struct {
@@ -73,10 +84,10 @@ func Load() (*Config, error) {
 	v.SetDefault("APP_HOST", "0.0.0.0")
 
 	v.SetDefault("DB_HOST", "localhost")
-	v.SetDefault("DB_PORT", "5432")
-	v.SetDefault("DB_USER", "postgres")
-	v.SetDefault("DB_PASSWORD", "postgres")
-	v.SetDefault("DB_NAME", "{{.DBName}}")
+	v.SetDefault("DB_PORT", "{{.DBDefaultPort}}")
+	v.SetDefault("DB_USER", "{{.DBDefaultUser}}")
+	v.SetDefault("DB_PASSWORD", "{{if eq .Database "mysql"}}root{{else}}postgres{{end}}")
+	v.SetDefault("DB_NAME", "{{.DBName}}{{if eq .Database "sqlite"}}.db{{end}}")
 	v.SetDefault("DB_SSLMODE", "disable")
 	v.SetDefault("DB_MAX_OPEN_CONNS", 25)
 	v.SetDefault("DB_MAX_IDLE_CONNS", 10)

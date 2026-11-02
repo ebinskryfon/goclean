@@ -1,3 +1,50 @@
+{{- if eq .Router "chi"}}
+package middleware
+
+import (
+	"net/http"
+	"time"
+
+	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/rs/zerolog"
+)
+
+func Logger(log zerolog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			path := r.URL.Path
+			if r.URL.RawQuery != "" {
+				path = path + "?" + r.URL.RawQuery
+			}
+
+			ww := chimw.NewWrapResponseWriter(w, r.ProtoMajor)
+			next.ServeHTTP(ww, r)
+
+			statusCode := ww.Status()
+			if statusCode == 0 {
+				statusCode = http.StatusOK
+			}
+
+			event := log.Info()
+			if statusCode >= 500 {
+				event = log.Error()
+			} else if statusCode >= 400 {
+				event = log.Warn()
+			}
+
+			event.
+				Int("status", statusCode).
+				Str("method", r.Method).
+				Str("path", path).
+				Str("ip", r.RemoteAddr).
+				Str("request_id", RequestIDFrom(r.Context())).
+				Dur("latency", time.Since(start)).
+				Msg("http request")
+		})
+	}
+}
+{{- else}}
 package middleware
 
 import (
@@ -38,3 +85,4 @@ func Logger(log zerolog.Logger) gin.HandlerFunc {
 			Msg("http request")
 	}
 }
+{{- end}}

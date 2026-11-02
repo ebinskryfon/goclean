@@ -1,11 +1,11 @@
 CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id {{if eq .Database "mysql"}}CHAR(36) PRIMARY KEY{{else if eq .Database "sqlite"}}TEXT PRIMARY KEY{{else}}UUID PRIMARY KEY DEFAULT gen_random_uuid(){{end}},
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    deleted_at TIMESTAMP WITH TIME ZONE
+    created_at {{if eq .Database "mysql"}}DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6){{else if eq .Database "sqlite"}}DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP{{else}}TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(){{end}},
+    updated_at {{if eq .Database "mysql"}}DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6){{else if eq .Database "sqlite"}}DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP{{else}}TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(){{end}},
+    deleted_at {{if eq .Database "mysql"}}DATETIME(6) NULL{{else if eq .Database "sqlite"}}DATETIME{{else}}TIMESTAMP WITH TIME ZONE{{end}}
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
+{{if eq .Database "mysql"}}CREATE INDEX idx_users_deleted_at ON users(deleted_at);{{else}}CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);{{end}}

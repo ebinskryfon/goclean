@@ -1,3 +1,45 @@
+{{- if eq .Router "chi"}}
+package handlers
+
+import (
+	"database/sql"
+	"net/http"
+
+	"{{.ModuleName}}/internal/delivery/http/response"
+)
+
+type HealthHandler struct {
+	sqlDB *sql.DB
+}
+
+func NewHealthHandler(sqlDB *sql.DB) *HealthHandler {
+	return &HealthHandler{sqlDB: sqlDB}
+}
+
+func (h *HealthHandler) Check(w http.ResponseWriter, r *http.Request) {
+	status := "healthy"
+	dbStatus := "connected"
+
+	if h.sqlDB != nil {
+		if err := h.sqlDB.PingContext(r.Context()); err != nil {
+			status = "degraded"
+			dbStatus = "unreachable"
+		}
+	} else {
+		dbStatus = "not_configured"
+	}
+
+	statusCode := http.StatusOK
+	if status != "healthy" {
+		statusCode = http.StatusServiceUnavailable
+	}
+
+	response.JSON(w, statusCode, map[string]string{
+		"status":   status,
+		"database": dbStatus,
+	})
+}
+{{- else}}
 package handlers
 
 import (
@@ -38,3 +80,4 @@ func (h *HealthHandler) Check(c *gin.Context) {
 		"database": dbStatus,
 	})
 }
+{{- end}}

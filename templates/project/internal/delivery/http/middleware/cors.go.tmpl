@@ -1,3 +1,29 @@
+{{- if eq .Router "chi"}}
+package middleware
+
+import (
+	"net/http"
+)
+
+func CORS() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h := w.Header()
+			h.Set("Access-Control-Allow-Origin", "*")
+			h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			h.Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Request-ID")
+			h.Set("Access-Control-Expose-Headers", "Content-Length, X-Request-ID")
+
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+{{- else}}
 package middleware
 
 import (
@@ -22,3 +48,4 @@ func CORS() gin.HandlerFunc {
 		c.Next()
 	}
 }
+{{- end}}

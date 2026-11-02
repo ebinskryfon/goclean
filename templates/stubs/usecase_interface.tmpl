@@ -12,5 +12,6 @@ type {{.EntityPascal}}Usecase interface {
 	Create(ctx context.Context, input types.Create{{.EntityPascal}}Input) (*entity.{{.EntityPascal}}, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*entity.{{.EntityPascal}}, error)
 	List(ctx context.Context, page, pageSize int) ([]*entity.{{.EntityPascal}}, int64, error)
+	Update(ctx context.Context, input types.Update{{.EntityPascal}}Input) (*entity.{{.EntityPascal}}, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }

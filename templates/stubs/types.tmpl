@@ -9,16 +9,30 @@ import (
 
 // Request DTOs
 type Create{{.EntityPascal}}Request struct {
+{{- range .Fields}}
+	{{.Pascal}} {{.GoType}} `json:"{{.Snake}}"{{if .Binding}} binding:"{{.Binding}}"{{end}}`
+{{- end}}
+{{- if not .Fields}}
 	// Add request fields with json and binding tags
+{{- end}}
 }
 
+// Update{{.EntityPascal}}Request uses pointers so omitted fields are left unchanged.
 type Update{{.EntityPascal}}Request struct {
+{{- range .Fields}}
+	{{.Pascal}} {{.PtrType}} `json:"{{.Snake}},omitempty"`
+{{- end}}
+{{- if not .Fields}}
 	// Add request fields with json and binding tags
+{{- end}}
 }
 
 // Response DTOs
 type {{.EntityPascal}}Response struct {
 	ID        uuid.UUID `json:"id"`
+{{- range .Fields}}
+	{{.Pascal}} {{.GoType}} `json:"{{.Snake}}"`
+{{- end}}
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -30,6 +44,9 @@ func To{{.EntityPascal}}Response(item *entity.{{.EntityPascal}}) {{.EntityPascal
 	}
 	return {{.EntityPascal}}Response{
 		ID:        item.ID,
+{{- range .Fields}}
+		{{.Pascal}}: item.{{.Pascal}},
+{{- end}}
 		CreatedAt: item.CreatedAt,
 		UpdatedAt: item.UpdatedAt,
 	}
@@ -37,10 +54,20 @@ func To{{.EntityPascal}}Response(item *entity.{{.EntityPascal}}) {{.EntityPascal
 
 // Input DTOs
 type Create{{.EntityPascal}}Input struct {
+{{- range .Fields}}
+	{{.Pascal}} {{.GoType}}
+{{- end}}
+{{- if not .Fields}}
 	// Add usecase input fields
+{{- end}}
 }
 
 type Update{{.EntityPascal}}Input struct {
 	ID uuid.UUID
+{{- range .Fields}}
+	{{.Pascal}} {{.PtrType}}
+{{- end}}
+{{- if not .Fields}}
 	// Add usecase input fields
+{{- end}}
 }
