@@ -5,16 +5,11 @@ import (
 
 	"github.com/google/uuid"
 	"{{.ModuleName}}/internal/domain/entity"
+	"{{.ModuleName}}/internal/types"
 )
 
-type RegisterUserInput struct {
-	Name     string
-	Email    string
-	Password string
-}
-
 type UserUsecase interface {
-	Register(ctx context.Context, input RegisterUserInput) (*entity.User, error)
+	Register(ctx context.Context, input types.RegisterUserInput) (*entity.User, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*entity.User, error)
 	List(ctx context.Context, page, pageSize int) ([]*entity.User, int64, error)
 }

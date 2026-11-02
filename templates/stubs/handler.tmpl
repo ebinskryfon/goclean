@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	domainerrors "{{.ModuleName}}/internal/domain/errors"
 	"{{.ModuleName}}/internal/delivery/http/response"
+	"{{.ModuleName}}/internal/types"
 	usecase "{{.ModuleName}}/internal/usecase/interface"
 )
 
@@ -20,19 +21,19 @@ func New{{.EntityPascal}}Handler(usecase usecase.{{.EntityPascal}}Usecase) *{{.E
 }
 
 func (h *{{.EntityPascal}}Handler) Create(c *gin.Context) {
-	var input usecase.Create{{.EntityPascal}}Input
-	if err := c.ShouldBindJSON(&input); err != nil {
+	var req types.Create{{.EntityPascal}}Request
+	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
-	item, err := h.usecase.Create(c.Request.Context(), input)
+	item, err := h.usecase.Create(c.Request.Context(), types.Create{{.EntityPascal}}Input{})
 	if err != nil {
 		response.Internal(c, "failed to create {{.EntitySnake}}")
 		return
 	}
 
-	response.Created(c, item)
+	response.Created(c, types.To{{.EntityPascal}}Response(item))
 }
 
 func (h *{{.EntityPascal}}Handler) GetByID(c *gin.Context) {
@@ -53,7 +54,7 @@ func (h *{{.EntityPascal}}Handler) GetByID(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, item)
+	response.Success(c, types.To{{.EntityPascal}}Response(item))
 }
 
 func (h *{{.EntityPascal}}Handler) List(c *gin.Context) {
@@ -66,8 +67,13 @@ func (h *{{.EntityPascal}}Handler) List(c *gin.Context) {
 		return
 	}
 
+	respItems := make([]types.{{.EntityPascal}}Response, 0, len(items))
+	for _, item := range items {
+		respItems = append(respItems, types.To{{.EntityPascal}}Response(item))
+	}
+
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
-	response.Paginated(c, items, response.Meta{
+	response.Paginated(c, respItems, response.Meta{
 		Page:       page,
 		PageSize:   pageSize,
 		TotalItems: total,

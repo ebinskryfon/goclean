@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"{{.ModuleName}}/internal/domain/entity"
 	"{{.ModuleName}}/internal/domain/repository"
+	"{{.ModuleName}}/internal/types"
 	usecase "{{.ModuleName}}/internal/usecase/interface"
 )
 
@@ -18,7 +19,7 @@ func New{{.EntityPascal}}Usecase(repo repository.{{.EntityPascal}}Repository) us
 	return &{{.EntityCamel}}Usecase{repo: repo}
 }
 
-func (u *{{.EntityCamel}}Usecase) Create(ctx context.Context, input usecase.Create{{.EntityPascal}}Input) (*entity.{{.EntityPascal}}, error) {
+func (u *{{.EntityCamel}}Usecase) Create(ctx context.Context, input types.Create{{.EntityPascal}}Input) (*entity.{{.EntityPascal}}, error) {
 	now := time.Now().UTC()
 	item := &entity.{{.EntityPascal}}{
 		ID:        uuid.New(),

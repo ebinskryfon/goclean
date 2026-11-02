@@ -1,0 +1,46 @@
+package types
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"{{.ModuleName}}/internal/domain/entity"
+)
+
+// Request DTOs
+type Create{{.EntityPascal}}Request struct {
+	// Add request fields with json and binding tags
+}
+
+type Update{{.EntityPascal}}Request struct {
+	// Add request fields with json and binding tags
+}
+
+// Response DTOs
+type {{.EntityPascal}}Response struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// To{{.EntityPascal}}Response maps a domain {{.EntityPascal}} entity to {{.EntityPascal}}Response.
+func To{{.EntityPascal}}Response(item *entity.{{.EntityPascal}}) {{.EntityPascal}}Response {
+	if item == nil {
+		return {{.EntityPascal}}Response{}
+	}
+	return {{.EntityPascal}}Response{
+		ID:        item.ID,
+		CreatedAt: item.CreatedAt,
+		UpdatedAt: item.UpdatedAt,
+	}
+}
+
+// Input DTOs
+type Create{{.EntityPascal}}Input struct {
+	// Add usecase input fields
+}
+
+type Update{{.EntityPascal}}Input struct {
+	ID uuid.UUID
+	// Add usecase input fields
+}

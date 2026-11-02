@@ -8,6 +8,7 @@ import (
 	"{{.ModuleName}}/internal/domain/entity"
 	domainerrors "{{.ModuleName}}/internal/domain/errors"
 	"{{.ModuleName}}/internal/domain/repository"
+	"{{.ModuleName}}/internal/types"
 	usecase "{{.ModuleName}}/internal/usecase/interface"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -22,7 +23,7 @@ func NewUserUsecase(userRepo repository.UserRepository) usecase.UserUsecase {
 	}
 }
 
-func (u *userUsecase) Register(ctx context.Context, input usecase.RegisterUserInput) (*entity.User, error) {
+func (u *userUsecase) Register(ctx context.Context, input types.RegisterUserInput) (*entity.User, error) {
 	existing, _ := u.userRepo.GetByEmail(ctx, input.Email)
 	if existing != nil {
 		return nil, domainerrors.ErrConflict

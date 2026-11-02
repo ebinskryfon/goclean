@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	domainerrors "{{.ModuleName}}/internal/domain/errors"
 	"{{.ModuleName}}/internal/delivery/http/response"
+	"{{.ModuleName}}/internal/types"
 	usecase "{{.ModuleName}}/internal/usecase/interface"
 )
 
@@ -19,20 +20,14 @@ func NewUserHandler(userUsecase usecase.UserUsecase) *UserHandler {
 	return &UserHandler{userUsecase: userUsecase}
 }
 
-type CreateUserRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
-}
-
 func (h *UserHandler) Register(c *gin.Context) {
-	var req CreateUserRequest
+	var req types.RegisterUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
-	user, err := h.userUsecase.Register(c.Request.Context(), usecase.RegisterUserInput{
+	user, err := h.userUsecase.Register(c.Request.Context(), types.RegisterUserInput{
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: req.Password,
@@ -46,7 +41,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
-	response.Created(c, user)
+	response.Created(c, types.ToUserResponse(user))
 }
 
 func (h *UserHandler) GetByID(c *gin.Context) {
@@ -67,7 +62,7 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, user)
+	response.Success(c, types.ToUserResponse(user))
 }
 
 func (h *UserHandler) List(c *gin.Context) {
@@ -80,8 +75,13 @@ func (h *UserHandler) List(c *gin.Context) {
 		return
 	}
 
+	items := make([]types.UserResponse, 0, len(users))
+	for _, u := range users {
+		items = append(items, types.ToUserResponse(u))
+	}
+
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
-	response.Paginated(c, users, response.Meta{
+	response.Paginated(c, items, response.Meta{
 		Page:       page,
 		PageSize:   pageSize,
 		TotalItems: total,

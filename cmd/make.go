@@ -36,6 +36,16 @@ var makeEntityCmd = &cobra.Command{
 	},
 }
 
+var makeTypesCmd = &cobra.Command{
+	Use:     "make:types <Name>",
+	Aliases: []string{"make:type", "make:dto"},
+	Short:   "Generate request, input, and response DTO types",
+	Args:    cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		runSingleLayerGenerator("types", args[0])
+	},
+}
+
 var makeRepoCmd = &cobra.Command{
 	Use:     "make:repo <Name>",
 	Aliases: []string{"make:repository"},

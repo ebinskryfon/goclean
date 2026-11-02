@@ -36,6 +36,7 @@ func init() {
 	rootCmd.AddCommand(newCmd)
 	rootCmd.AddCommand(makeModuleCmd)
 	rootCmd.AddCommand(makeEntityCmd)
+	rootCmd.AddCommand(makeTypesCmd)
 	rootCmd.AddCommand(makeRepoCmd)
 	rootCmd.AddCommand(makeUsecaseCmd)
 	rootCmd.AddCommand(makeHandlerCmd)

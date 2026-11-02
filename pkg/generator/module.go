@@ -127,6 +127,7 @@ func GenerateModule(rootPath, rawName string) error {
 		dest string
 	}{
 		{"entity.tmpl", filepath.Join(projectRoot, "internal", "domain", "entity", data.EntitySnake+".go")},
+		{"types.tmpl", filepath.Join(projectRoot, "internal", "types", data.EntitySnake+".go")},
 		{"repository.tmpl", filepath.Join(projectRoot, "internal", "domain", "repository", data.EntitySnake+"_repository.go")},
 		{"persistence.tmpl", filepath.Join(projectRoot, "internal", "infrastructure", "persistence", data.EntitySnake+"_repository.go")},
 		{"usecase_interface.tmpl", filepath.Join(projectRoot, "internal", "usecase", "interface", data.EntitySnake+"_usecase.go")},
@@ -182,6 +183,9 @@ func GenerateSingleLayer(rootPath, layerType, rawName string) error {
 	case "entity":
 		dest := filepath.Join(projectRoot, "internal", "domain", "entity", data.EntitySnake+".go")
 		return renderStub("entity.tmpl", dest, data)
+	case "types", "type", "dto":
+		dest := filepath.Join(projectRoot, "internal", "types", data.EntitySnake+".go")
+		return renderStub("types.tmpl", dest, data)
 	case "repo", "repository":
 		dest1 := filepath.Join(projectRoot, "internal", "domain", "repository", data.EntitySnake+"_repository.go")
 		dest2 := filepath.Join(projectRoot, "internal", "infrastructure", "persistence", data.EntitySnake+"_repository.go")
