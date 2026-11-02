@@ -1,0 +1,54 @@
+package implementation
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+	"{{.ModuleName}}/internal/domain/entity"
+	"{{.ModuleName}}/internal/domain/repository"
+	usecase "{{.ModuleName}}/internal/usecase/interface"
+)
+
+type {{.EntityCamel}}Usecase struct {
+	repo repository.{{.EntityPascal}}Repository
+}
+
+func New{{.EntityPascal}}Usecase(repo repository.{{.EntityPascal}}Repository) usecase.{{.EntityPascal}}Usecase {
+	return &{{.EntityCamel}}Usecase{repo: repo}
+}
+
+func (u *{{.EntityCamel}}Usecase) Create(ctx context.Context, input usecase.Create{{.EntityPascal}}Input) (*entity.{{.EntityPascal}}, error) {
+	now := time.Now().UTC()
+	item := &entity.{{.EntityPascal}}{
+		ID:        uuid.New(),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	if err := u.repo.Create(ctx, item); err != nil {
+		return nil, err
+	}
+
+	return item, nil
+}
+
+func (u *{{.EntityCamel}}Usecase) GetByID(ctx context.Context, id uuid.UUID) (*entity.{{.EntityPascal}}, error) {
+	return u.repo.GetByID(ctx, id)
+}
+
+func (u *{{.EntityCamel}}Usecase) List(ctx context.Context, page, pageSize int) ([]*entity.{{.EntityPascal}}, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	return u.repo.List(ctx, pageSize, offset)
+}
+
+func (u *{{.EntityCamel}}Usecase) Delete(ctx context.Context, id uuid.UUID) error {
+	return u.repo.Delete(ctx, id)
+}

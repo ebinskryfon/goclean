@@ -1,0 +1,24 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  bin = "./tmp/main"
+  cmd = "go build -o ./tmp/main ./cmd/api"
+  delay = 1000
+  exclude_dir = ["assets", "tmp", "vendor", "migrations", "docs"]
+  include_ext = ["go", "tpl", "tmpl", "html", "yaml", "yml", "env"]
+  exclude_regex = ["_test.go"]
+  stop_on_error = true
+
+[color]
+  app = ""
+  build = "yellow"
+  main = "magenta"
+  runner = "green"
+  watcher = "cyan"
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true

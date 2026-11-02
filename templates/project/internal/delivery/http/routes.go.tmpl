@@ -1,0 +1,39 @@
+package http
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
+	"{{.ModuleName}}/config"
+	"{{.ModuleName}}/internal/delivery/http/middleware"
+	"{{.ModuleName}}/internal/infrastructure/container"
+)
+
+func SetupRouter(cfg *config.Config, log zerolog.Logger, c *container.AppContainer) *gin.Engine {
+	if cfg.App.Env == "production" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
+	r := gin.New()
+
+	// Global Middlewares
+	r.Use(middleware.RequestID())
+	r.Use(middleware.Logger(log))
+	r.Use(middleware.Recovery(log))
+	r.Use(middleware.CORS())
+
+	// Health Check endpoint
+	r.GET("/health", c.HealthHandler.Check)
+
+	// API v1 group
+	v1 := r.Group("/api/v1")
+	{
+		users := v1.Group("/users")
+		{
+			users.POST("", c.UserHandler.Register)
+			users.GET("", c.UserHandler.List)
+			users.GET("/:id", c.UserHandler.GetByID)
+		}
+	}
+
+	return r
+}

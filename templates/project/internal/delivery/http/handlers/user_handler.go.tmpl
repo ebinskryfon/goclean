@@ -1,0 +1,90 @@
+package handlers
+
+import (
+	"errors"
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	domainerrors "{{.ModuleName}}/internal/domain/errors"
+	"{{.ModuleName}}/internal/delivery/http/response"
+	usecase "{{.ModuleName}}/internal/usecase/interface"
+)
+
+type UserHandler struct {
+	userUsecase usecase.UserUsecase
+}
+
+func NewUserHandler(userUsecase usecase.UserUsecase) *UserHandler {
+	return &UserHandler{userUsecase: userUsecase}
+}
+
+type CreateUserRequest struct {
+	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+}
+
+func (h *UserHandler) Register(c *gin.Context) {
+	var req CreateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	user, err := h.userUsecase.Register(c.Request.Context(), usecase.RegisterUserInput{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	if err != nil {
+		if errors.Is(err, domainerrors.ErrConflict) {
+			response.Conflict(c, "a user with this email already exists")
+			return
+		}
+		response.Internal(c, "failed to create user")
+		return
+	}
+
+	response.Created(c, user)
+}
+
+func (h *UserHandler) GetByID(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := uuid.Parse(idParam)
+	if err != nil {
+		response.BadRequest(c, "invalid uuid format")
+		return
+	}
+
+	user, err := h.userUsecase.GetByID(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, domainerrors.ErrNotFound) {
+			response.NotFound(c, "user not found")
+			return
+		}
+		response.Internal(c, "failed to retrieve user")
+		return
+	}
+
+	response.Success(c, user)
+}
+
+func (h *UserHandler) List(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	users, total, err := h.userUsecase.List(c.Request.Context(), page, pageSize)
+	if err != nil {
+		response.Internal(c, "failed to list users")
+		return
+	}
+
+	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
+	response.Paginated(c, users, response.Meta{
+		Page:       page,
+		PageSize:   pageSize,
+		TotalItems: total,
+		TotalPages: totalPages,
+	})
+}

@@ -1,0 +1,71 @@
+package persistence
+
+import (
+	"context"
+	"errors"
+
+	"github.com/google/uuid"
+	"{{.ModuleName}}/internal/domain/entity"
+	domainerrors "{{.ModuleName}}/internal/domain/errors"
+	"{{.ModuleName}}/internal/domain/repository"
+	"gorm.io/gorm"
+)
+
+type gorm{{.EntityPascal}}Repository struct {
+	db *gorm.DB
+}
+
+func New{{.EntityPascal}}Repository(db *gorm.DB) repository.{{.EntityPascal}}Repository {
+	return &gorm{{.EntityPascal}}Repository{db: db}
+}
+
+func (r *gorm{{.EntityPascal}}Repository) Create(ctx context.Context, item *entity.{{.EntityPascal}}) error {
+	return r.db.WithContext(ctx).Create(item).Error
+}
+
+func (r *gorm{{.EntityPascal}}Repository) GetByID(ctx context.Context, id uuid.UUID) (*entity.{{.EntityPascal}}, error) {
+	var item entity.{{.EntityPascal}}
+	err := r.db.WithContext(ctx).First(&item, "id = ?", id).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domainerrors.ErrNotFound
+		}
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (r *gorm{{.EntityPascal}}Repository) List(ctx context.Context, limit, offset int) ([]*entity.{{.EntityPascal}}, int64, error) {
+	var items []*entity.{{.EntityPascal}}
+	var total int64
+
+	db := r.db.WithContext(ctx).Model(&entity.{{.EntityPascal}}{})
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if limit > 0 {
+		db = db.Limit(limit).Offset(offset)
+	}
+
+	if err := db.Order("created_at DESC").Find(&items).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return items, total, nil
+}
+
+func (r *gorm{{.EntityPascal}}Repository) Update(ctx context.Context, item *entity.{{.EntityPascal}}) error {
+	return r.db.WithContext(ctx).Save(item).Error
+}
+
+func (r *gorm{{.EntityPascal}}Repository) Delete(ctx context.Context, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Delete(&entity.{{.EntityPascal}}{}, "id = ?", id)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return domainerrors.ErrNotFound
+	}
+	return nil
+}

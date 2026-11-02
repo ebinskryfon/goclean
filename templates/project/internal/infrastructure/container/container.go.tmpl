@@ -1,0 +1,43 @@
+package container
+
+import (
+	"database/sql"
+
+	"github.com/rs/zerolog"
+	"gorm.io/gorm"
+
+	"{{.ModuleName}}/config"
+	"{{.ModuleName}}/internal/delivery/http/handlers"
+	"{{.ModuleName}}/internal/infrastructure/persistence"
+	usecaseimpl "{{.ModuleName}}/internal/usecase/implementation"
+)
+
+type AppContainer struct {
+	Config *config.Config
+	Log    zerolog.Logger
+	DB     *gorm.DB
+
+	// Handlers
+	HealthHandler *handlers.HealthHandler
+	UserHandler   *handlers.UserHandler
+}
+
+func New(cfg *config.Config, db *gorm.DB, sqlDB *sql.DB, log zerolog.Logger) (*AppContainer, error) {
+	// Repositories
+	userRepo := persistence.NewUserRepository(db)
+
+	// Usecases
+	userUsecase := usecaseimpl.NewUserUsecase(userRepo)
+
+	// Handlers
+	healthHandler := handlers.NewHealthHandler(sqlDB)
+	userHandler := handlers.NewUserHandler(userUsecase)
+
+	return &AppContainer{
+		Config:        cfg,
+		Log:           log,
+		DB:            db,
+		HealthHandler: healthHandler,
+		UserHandler:   userHandler,
+	}, nil
+}

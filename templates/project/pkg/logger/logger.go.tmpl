@@ -1,0 +1,38 @@
+package logger
+
+import (
+	"os"
+	"strings"
+	"time"
+
+	"github.com/rs/zerolog"
+)
+
+// New initializes a zerolog.Logger configured with human-readable console output for local development.
+func New(levelStr string) zerolog.Logger {
+	level := parseLevel(levelStr)
+
+	output := zerolog.ConsoleWriter{
+		Out:        os.Stdout,
+		TimeFormat: time.RFC3339,
+	}
+
+	return zerolog.New(output).
+		Level(level).
+		With().
+		Timestamp().
+		Logger()
+}
+
+func parseLevel(levelStr string) zerolog.Level {
+	switch strings.ToLower(strings.TrimSpace(levelStr)) {
+	case "debug":
+		return zerolog.DebugLevel
+	case "warn", "warning":
+		return zerolog.WarnLevel
+	case "error":
+		return zerolog.ErrorLevel
+	default:
+		return zerolog.InfoLevel
+	}
+}

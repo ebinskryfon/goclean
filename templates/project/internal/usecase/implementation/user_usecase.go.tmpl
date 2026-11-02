@@ -1,0 +1,67 @@
+package implementation
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+	"{{.ModuleName}}/internal/domain/entity"
+	domainerrors "{{.ModuleName}}/internal/domain/errors"
+	"{{.ModuleName}}/internal/domain/repository"
+	usecase "{{.ModuleName}}/internal/usecase/interface"
+	"golang.org/x/crypto/bcrypt"
+)
+
+type userUsecase struct {
+	userRepo repository.UserRepository
+}
+
+func NewUserUsecase(userRepo repository.UserRepository) usecase.UserUsecase {
+	return &userUsecase{
+		userRepo: userRepo,
+	}
+}
+
+func (u *userUsecase) Register(ctx context.Context, input usecase.RegisterUserInput) (*entity.User, error) {
+	existing, _ := u.userRepo.GetByEmail(ctx, input.Email)
+	if existing != nil {
+		return nil, domainerrors.ErrConflict
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	user := &entity.User{
+		ID:           uuid.New(),
+		Name:         input.Name,
+		Email:        input.Email,
+		PasswordHash: string(hash),
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := u.userRepo.Create(ctx, user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (u *userUsecase) GetByID(ctx context.Context, id uuid.UUID) (*entity.User, error) {
+	return u.userRepo.GetByID(ctx, id)
+}
+
+func (u *userUsecase) List(ctx context.Context, page, pageSize int) ([]*entity.User, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	return u.userRepo.List(ctx, pageSize, offset)
+}

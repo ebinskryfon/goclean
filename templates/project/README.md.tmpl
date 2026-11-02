@@ -1,0 +1,69 @@
+# {{.ProjectName}}
+
+Generated with [goclean](https://github.com/ebinskryfon/goclean) — Go Clean Architecture CLI.
+
+## Requirements
+
+- Go 1.22+
+- Docker & Docker Compose (for local PostgreSQL)
+
+## Getting Started
+
+1. **Start the database:**
+   ```bash
+   docker compose up -d
+   ```
+
+2. **Run migrations:**
+   ```bash
+   make migrate
+   ```
+
+3. **Run development server with hot-reload:**
+   ```bash
+   make dev
+   ```
+   Or without air:
+   ```bash
+   make run
+   ```
+
+4. **Verify it works:**
+   ```bash
+   curl http://localhost:8080/health
+   ```
+
+## Folder Structure
+
+```
+├── cmd/
+│   ├── api/                 # Application server entrypoint & graceful shutdown
+│   └── migrate/             # Database migration runner
+├── config/                  # Viper-based configuration loader
+├── internal/
+│   ├── delivery/
+│   │   └── http/            # HTTP routes, handlers, middleware, JSON envelopes
+│   ├── domain/
+│   │   ├── entity/          # Pure business entities
+│   │   ├── errors/          # Standard domain errors
+│   │   ├── repository/      # Repository interface contracts
+│   │   └── service/         # Domain service contracts
+│   ├── infrastructure/
+│   │   ├── container/       # Dependency injection container
+│   │   ├── database/        # GORM PostgreSQL connection pool & fail-fast
+│   │   ├── persistence/     # Repository database implementations
+│   │   └── server/          # HTTP server lifecycle
+│   └── usecase/
+│       ├── interface/       # Usecase contracts
+│       └── implementation/  # Concrete business logic
+├── pkg/
+│   └── logger/              # Zerolog structured logging
+└── migrations/              # SQL migration files
+```
+
+## Artisan Code Generation
+
+Generate a complete Clean Architecture module in one command:
+```bash
+goclean make:module Product
+```

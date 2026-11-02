@@ -1,0 +1,96 @@
+package handlers
+
+import (
+	"errors"
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	domainerrors "{{.ModuleName}}/internal/domain/errors"
+	"{{.ModuleName}}/internal/delivery/http/response"
+	usecase "{{.ModuleName}}/internal/usecase/interface"
+)
+
+type {{.EntityPascal}}Handler struct {
+	usecase usecase.{{.EntityPascal}}Usecase
+}
+
+func New{{.EntityPascal}}Handler(usecase usecase.{{.EntityPascal}}Usecase) *{{.EntityPascal}}Handler {
+	return &{{.EntityPascal}}Handler{usecase: usecase}
+}
+
+func (h *{{.EntityPascal}}Handler) Create(c *gin.Context) {
+	var input usecase.Create{{.EntityPascal}}Input
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	item, err := h.usecase.Create(c.Request.Context(), input)
+	if err != nil {
+		response.Internal(c, "failed to create {{.EntitySnake}}")
+		return
+	}
+
+	response.Created(c, item)
+}
+
+func (h *{{.EntityPascal}}Handler) GetByID(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := uuid.Parse(idParam)
+	if err != nil {
+		response.BadRequest(c, "invalid uuid format")
+		return
+	}
+
+	item, err := h.usecase.GetByID(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, domainerrors.ErrNotFound) {
+			response.NotFound(c, "{{.EntitySnake}} not found")
+			return
+		}
+		response.Internal(c, "failed to retrieve {{.EntitySnake}}")
+		return
+	}
+
+	response.Success(c, item)
+}
+
+func (h *{{.EntityPascal}}Handler) List(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	items, total, err := h.usecase.List(c.Request.Context(), page, pageSize)
+	if err != nil {
+		response.Internal(c, "failed to list {{.EntityPluralSnake}}")
+		return
+	}
+
+	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
+	response.Paginated(c, items, response.Meta{
+		Page:       page,
+		PageSize:   pageSize,
+		TotalItems: total,
+		TotalPages: totalPages,
+	})
+}
+
+func (h *{{.EntityPascal}}Handler) Delete(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := uuid.Parse(idParam)
+	if err != nil {
+		response.BadRequest(c, "invalid uuid format")
+		return
+	}
+
+	if err := h.usecase.Delete(c.Request.Context(), id); err != nil {
+		if errors.Is(err, domainerrors.ErrNotFound) {
+			response.NotFound(c, "{{.EntitySnake}} not found")
+			return
+		}
+		response.Internal(c, "failed to delete {{.EntitySnake}}")
+		return
+	}
+
+	response.Success(c, gin.H{"deleted": true})
+}

@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS {{.EntityPluralSnake}} (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_{{.EntityPluralSnake}}_deleted_at ON {{.EntityPluralSnake}}(deleted_at);

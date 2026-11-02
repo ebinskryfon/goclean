@@ -1,0 +1,41 @@
+package handlers
+
+import (
+	"database/sql"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"{{.ModuleName}}/internal/delivery/http/response"
+)
+
+type HealthHandler struct {
+	sqlDB *sql.DB
+}
+
+func NewHealthHandler(sqlDB *sql.DB) *HealthHandler {
+	return &HealthHandler{sqlDB: sqlDB}
+}
+
+func (h *HealthHandler) Check(c *gin.Context) {
+	status := "healthy"
+	dbStatus := "connected"
+
+	if h.sqlDB != nil {
+		if err := h.sqlDB.PingContext(c.Request.Context()); err != nil {
+			status = "degraded"
+			dbStatus = "unreachable"
+		}
+	} else {
+		dbStatus = "not_configured"
+	}
+
+	statusCode := http.StatusOK
+	if status != "healthy" {
+		statusCode = http.StatusServiceUnavailable
+	}
+
+	c.JSON(statusCode, gin.H{
+		"status":   status,
+		"database": dbStatus,
+	})
+}

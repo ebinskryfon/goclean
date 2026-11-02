@@ -1,0 +1,16 @@
+package repository
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+	"{{.ModuleName}}/internal/domain/entity"
+)
+
+type {{.EntityPascal}}Repository interface {
+	Create(ctx context.Context, item *entity.{{.EntityPascal}}) error
+	GetByID(ctx context.Context, id uuid.UUID) (*entity.{{.EntityPascal}}, error)
+	List(ctx context.Context, limit, offset int) ([]*entity.{{.EntityPascal}}, int64, error)
+	Update(ctx context.Context, item *entity.{{.EntityPascal}}) error
+	Delete(ctx context.Context, id uuid.UUID) error
+}
