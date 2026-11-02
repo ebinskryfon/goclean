@@ -25,6 +25,7 @@ var (
 	flagNoGit    bool
 	flagDatabase string
 	flagRouter   string
+	flagORM      string
 	flagNoTidy   bool
 )
 
@@ -56,13 +57,24 @@ var newCmd = &cobra.Command{
 			return fmt.Errorf("invalid project name %q: use letters, digits, '-', '_' or '.', starting with a letter or digit", projectName)
 		}
 
+		if interactive() && !flagDryRun {
+			if err := runStackWizard(cmd); err != nil {
+				return fmt.Errorf("stack selection cancelled: %w", err)
+			}
+		}
+
 		flagDatabase = strings.ToLower(flagDatabase)
+		flagORM = strings.ToLower(flagORM)
 		flagRouter = strings.ToLower(flagRouter)
 		if !slices.Contains(generator.SupportedDatabases, flagDatabase) {
 			return fmt.Errorf("unsupported --database %q (supported: %s)", flagDatabase, strings.Join(generator.SupportedDatabases, ", "))
 		}
 		if !slices.Contains(generator.SupportedRouters, flagRouter) {
 			return fmt.Errorf("unsupported --router %q (supported: %s)", flagRouter, strings.Join(generator.SupportedRouters, ", "))
+		}
+
+		if !slices.Contains(generator.SupportedORMs, flagORM) {
+			return fmt.Errorf("unsupported --orm %q (supported: %s)", flagORM, strings.Join(generator.SupportedORMs, ", "))
 		}
 
 		cleanProjectName := strutil.ToKebabCase(projectName)
@@ -91,7 +103,7 @@ var newCmd = &cobra.Command{
 
 		ui.Header(fmt.Sprintf("Creating project '%s'...", cleanProjectName))
 		ui.Info("Module:   %s", moduleName)
-		ui.Info("Stack:    %s + %s", flagRouter, flagDatabase)
+		ui.Info("Stack:    %s + %s + %s", flagRouter, flagDatabase, flagORM)
 		ui.Info("Database: %s", dbName)
 		ui.Info("Target:   %s", targetDir)
 		fmt.Println()
@@ -103,6 +115,7 @@ var newCmd = &cobra.Command{
 			TargetDir:   targetDir,
 			Database:    flagDatabase,
 			Router:      flagRouter,
+			ORM:         flagORM,
 			NoGit:       flagNoGit,
 			NoTidy:      flagNoTidy,
 			Force:       flagForce,
@@ -140,6 +153,7 @@ func init() {
 	newCmd.Flags().StringVarP(&flagModule, "module", "m", "", "Go module path (e.g. github.com/username/project)")
 	newCmd.Flags().StringVar(&flagDatabase, "database", generator.DBPostgres, "database engine: "+strings.Join(generator.SupportedDatabases, ", "))
 	newCmd.Flags().StringVar(&flagRouter, "router", generator.RouterGin, "HTTP router: "+strings.Join(generator.SupportedRouters, ", "))
+	newCmd.Flags().StringVar(&flagORM, "orm", generator.ORMGorm, "ORM / data access: "+strings.Join(generator.SupportedORMs, ", "))
 	newCmd.Flags().BoolVar(&flagNoGit, "no-git", false, "skip git init")
 	newCmd.Flags().BoolVar(&flagNoTidy, "no-tidy", false, "skip go mod tidy")
 	newCmd.Flags().StringVarP(&flagDB, "db", "d", "", "PostgreSQL database name (default: <project>_db)")

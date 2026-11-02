@@ -26,7 +26,7 @@ export PATH=$PATH:$(go env GOPATH)/bin
 ### 1. Create a New Project
 
 ```bash
-# Interactive mode (prompts for module name, database, etc.)
+# Interactive mode (arrow-key menus for framework and database, prompts for module name)
 goclean new my-saas
 
 # Or non-interactive with flags
@@ -41,6 +41,9 @@ goclean new my-shop --router gin --database mysql
 |------|--------|-------|
 | `--router` | `gin` (default), `chi` | chi uses plain `net/http` handlers; request validation uses the same `binding:"..."` tags |
 | `--database` | `postgres` (default), `mysql`, `sqlite` | SQLite is pure Go (no cgo) and skips `docker-compose.yml` |
+| `--orm` | `gorm` (default) | Saved in `.goclean.json`; more ORMs are planned (see Roadmap) |
+
+In a terminal, any of `--router`, `--database` that you don't pass is asked with an arrow-key menu. Passing the flag skips its question, and piped or CI runs never prompt.
 
 The choice is saved in `.goclean.json`, so `make:*` generators emit matching handlers, routes, SQL types and migrations.
 
@@ -180,6 +183,17 @@ make dev
 # 4. Check API health
 curl http://localhost:8080/health
 ```
+
+---
+
+## 🗺 Roadmap
+
+Planned for a later version:
+
+- **Frameworks:** Echo, Fiber
+- **ORMs / data access:** sqlx, Bun, Ent (GORM stays the default)
+
+These need the project templates split into per-router and per-ORM layers, so the wizard will list them once they are implemented.
 
 ---
 

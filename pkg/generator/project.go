@@ -24,6 +24,8 @@ const (
 
 	RouterGin = "gin"
 	RouterChi = "chi"
+
+	ORMGorm = "gorm"
 )
 
 var (
@@ -31,12 +33,15 @@ var (
 	SupportedDatabases = []string{DBPostgres, DBMySQL, DBSQLite}
 	// SupportedRouters lists valid values for ProjectOptions.Router.
 	SupportedRouters = []string{RouterGin, RouterChi}
+	// SupportedORMs lists valid values for ProjectOptions.ORM.
+	SupportedORMs = []string{ORMGorm}
 )
 
 // ProjectConfig is persisted as .goclean.json so later `make:*` commands match the project's stack.
 type ProjectConfig struct {
 	Database string `json:"database"`
 	Router   string `json:"router"`
+	ORM      string `json:"orm"`
 }
 
 const projectConfigFile = ".goclean.json"
@@ -48,6 +53,7 @@ type ProjectOptions struct {
 	TargetDir   string
 	Database    string // postgres (default), mysql, sqlite
 	Router      string // gin (default), chi
+	ORM         string // gorm (default)
 	NoGit       bool   // skip `git init`
 	NoTidy      bool   // skip `go mod tidy`
 	Force       bool   // allow generating into a non-empty directory (overwrites files)
@@ -92,6 +98,12 @@ func GenerateProject(opts ProjectOptions) (err error) {
 	}
 	if opts.Router == "" {
 		opts.Router = RouterGin
+	}
+	if opts.ORM == "" {
+		opts.ORM = ORMGorm
+	}
+	if !contains(SupportedORMs, opts.ORM) {
+		return fmt.Errorf("unsupported orm %q (supported: %s)", opts.ORM, strings.Join(SupportedORMs, ", "))
 	}
 	if !contains(SupportedDatabases, opts.Database) {
 		return fmt.Errorf("unsupported database %q (supported: %s)", opts.Database, strings.Join(SupportedDatabases, ", "))
@@ -186,7 +198,7 @@ func GenerateProject(opts ProjectOptions) (err error) {
 		return nil
 	}
 
-	cfgJSON, _ := json.MarshalIndent(ProjectConfig{Database: opts.Database, Router: opts.Router}, "", "  ")
+	cfgJSON, _ := json.MarshalIndent(ProjectConfig{Database: opts.Database, Router: opts.Router, ORM: opts.ORM}, "", "  ")
 	if err := os.WriteFile(filepath.Join(opts.TargetDir, projectConfigFile), append(cfgJSON, '\n'), 0644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", projectConfigFile, err)
 	}
