@@ -1,8 +1,8 @@
 # goclean 🚀
 
-**A modern, production-grade Go Clean Architecture scaffolding and code generator CLI tool — inspired by Laravel & Artisan.**
+**A modern, production-grade Go Clean Architecture scaffolding and code generator CLI tool.**
 
-Bakes in the enterprise-tested architecture from real-world Go backend production systems (Gin, GORM, PostgreSQL, Viper, Zerolog, migrations, Docker).
+Bakes in enterprise-tested architecture from real-world Go backend production systems (Gin, GORM, PostgreSQL, Viper, Zerolog, migrations, Docker).
 
 ---
 
@@ -23,7 +23,7 @@ export PATH=$PATH:$(go env GOPATH)/bin
 
 ## 🛠 Usage
 
-### 1. Create a New Project (`laravel new` equivalent)
+### 1. Create a New Project
 
 ```bash
 # Interactive mode (prompts for module name, database, etc.)
@@ -44,7 +44,7 @@ This bootstraps a complete Clean Architecture project in seconds:
 
 ---
 
-### 2. Scaffold Features (`php artisan make:*` equivalent)
+### 2. Scaffold Features (`make:*` generators)
 
 Inside your project directory, generate complete Clean Architecture components instantly:
 

@@ -20,7 +20,7 @@ var rootCmd = &cobra.Command{
 | |_| | (_) | |___| |  __/ (_| | | | |
  \____|\___/ \____|_|\___|\__,_|_| |_|  v%s%s
 
-Go Clean Architecture Scaffolding Tool (inspired by Laravel).
+Go Clean Architecture Scaffolding & Code Generation Tool.
 Quickly bootstrap production-ready Go projects and scaffold Clean Architecture modules.`, ui.Bold, ui.Cyan, AppVersion, ui.Reset),
 }
 
