@@ -186,7 +186,11 @@ func GenerateProject(opts ProjectOptions) (err error) {
 			return err
 		}
 
-		return os.WriteFile(destPath, buf.Bytes(), 0644)
+		out, err := formatGo(destPath, buf.Bytes())
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(destPath, out, 0644)
 	})
 
 	if err != nil {

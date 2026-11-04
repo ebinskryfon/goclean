@@ -122,6 +122,10 @@ func (r *runner) write(path string, content []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
+	content, err := formatGo(path, content)
+	if err != nil {
+		return err
+	}
 	if err := os.WriteFile(path, content, 0644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", path, err)
 	}
