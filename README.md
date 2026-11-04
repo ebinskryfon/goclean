@@ -2,6 +2,12 @@
 
 **A modern, production-grade Go Clean Architecture scaffolding and code generator CLI tool.**
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/ebinskryfon/goclean.svg)](https://pkg.go.dev/github.com/ebinskryfon/goclean)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/website-goclean.cloud-22d3ee)](https://www.goclean.cloud)
+
+📖 **[Documentation](https://www.goclean.cloud/docs/introduction/)** · 🌐 **[Website](https://www.goclean.cloud)** · 📝 **[Changelog](https://www.goclean.cloud/changelog/)** · 📦 **[Download the desktop installer](https://www.goclean.cloud/#download)**
+
 Bakes in enterprise-tested architecture from real-world Go backend production systems (Gin, GORM, PostgreSQL, Viper, Zerolog, migrations, Docker).
 
 ---
@@ -227,3 +233,12 @@ make build   # ./bin/goclean with the version stamped in
 CI (`.github/workflows/ci.yml`) runs format, vet, tests and the smoke test. Pushing a `v*` tag runs GoReleaser
 (`.goreleaser.yaml`) to publish binaries. `go install github.com/ebinskryfon/goclean@vX.Y.Z` reports its
 module version automatically.
+
+---
+
+## 📚 Learn more
+
+- [Quick Start](https://www.goclean.cloud/docs/quick-start/): create your first project in minutes
+- [Project Structure](https://www.goclean.cloud/docs/project-structure/): what goclean generates and why
+- [Available Commands](https://www.goclean.cloud/docs/available-commands/): every command and flag
+- [Troubleshooting](https://www.goclean.cloud/docs/troubleshooting/): common problems and fixes
