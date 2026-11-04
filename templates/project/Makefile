@@ -1,4 +1,4 @@
-.PHONY: run dev build migrate migrate-down test tidy clean help
+.PHONY: docker-build run dev build migrate migrate-down test tidy clean help
 
 help: ## Show this help menu
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -18,6 +18,9 @@ dev: ## Run with hot-reloading (air)
 build: ## Build API binary
 	@mkdir -p bin
 	go build -o bin/api ./cmd/api
+
+docker-build: ## Build the application Docker image
+	docker build -t {{.ProjectName}}:latest .
 
 migrate: ## Run pending database migrations
 	go run ./cmd/migrate up

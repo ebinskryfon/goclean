@@ -217,6 +217,11 @@ func TestStackMatrixGeneratesValidGo(t *testing.T) {
 				if (db == DBSQLite) != os.IsNotExist(composeErr) {
 					t.Errorf("docker-compose.yml presence wrong for %s (err=%v)", db, composeErr)
 				}
+				for _, f := range []string{"Dockerfile", ".dockerignore"} {
+					if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
+						t.Errorf("%s not generated for %s: %v", f, db, err)
+					}
+				}
 				routes := read("internal/delivery/http/routes.go")
 				if router == RouterChi && !strings.Contains(routes, `v1.Route("/products"`) {
 					t.Error("chi routes not registered")
