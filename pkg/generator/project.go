@@ -76,6 +76,21 @@ func (o ProjectOptions) DBDefaultUser() string {
 	return "postgres"
 }
 
+// ImageName is ProjectName normalised into a valid Docker image reference
+// (lowercase; anything outside [a-z0-9._-] becomes '-').
+func (o ProjectOptions) ImageName() string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(o.ProjectName) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '.', r == '_', r == '-':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('-')
+		}
+	}
+	return strings.Trim(b.String(), "-._")
+}
+
 func contains(list []string, v string) bool {
 	for _, x := range list {
 		if x == v {

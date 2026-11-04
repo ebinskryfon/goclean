@@ -222,6 +222,10 @@ func TestStackMatrixGeneratesValidGo(t *testing.T) {
 						t.Errorf("%s not generated for %s: %v", f, db, err)
 					}
 				}
+				df := read("Dockerfile")
+				if (db == DBSQLite) != strings.Contains(df, "/data") {
+					t.Errorf("Dockerfile /data volume wrong for %s", db)
+				}
 				routes := read("internal/delivery/http/routes.go")
 				if router == RouterChi && !strings.Contains(routes, `v1.Route("/products"`) {
 					t.Error("chi routes not registered")

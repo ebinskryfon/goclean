@@ -20,7 +20,7 @@ build: ## Build API binary
 	go build -o bin/api ./cmd/api
 
 docker-build: ## Build the application Docker image
-	docker build -t {{.ProjectName}}:latest .
+	docker build -t {{.ImageName}}:latest .
 
 migrate: ## Run pending database migrations
 	go run ./cmd/migrate up
